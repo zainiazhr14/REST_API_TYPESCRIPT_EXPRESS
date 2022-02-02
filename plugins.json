@@ -1,0 +1,13 @@
+{
+  "monorepo": [
+    {
+      "plugin": "user"
+    },
+    {
+      "plugin": "admin"
+    },
+    {
+      "plugin": "article"
+    }
+  ]
+}

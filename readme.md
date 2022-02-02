@@ -15,7 +15,6 @@ Install dependencies
 ```javascript
 cd REST_API_TYPESCRIPT_EXPRESS
 npm install
-npm run build
 ```
 
 ## RUNNING API
@@ -28,22 +27,6 @@ Running API (Make sure MongoDB and PostgreSQL is running)
 
 // on local
 npm run local
-
-```
-### DEVELOPMENT
-```javascript
-// Create .env.development if on server development
-
-// on development
-npm run development
-
-```
-### PRODUCTION
-```javascript
-// Create .env.production
-
-// on production
-npm run production
 
 ```
 

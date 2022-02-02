@@ -5,8 +5,8 @@
   "main": "dist/app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc -w",
-    "local": "nodemon -r dotenv/config dist/app.js dotenv_config_path=.env.local",
+    "build": "tsc tsc",
+    "local": "nodemon -r dotenv/config app.ts dotenv_config_path=.env.local",
     "test-local": "tsc -w & nodemon -r dotenv/config dist/app.js dotenv_config_path=.env.local"
   },
   "author": "",
@@ -14,6 +14,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.12",
     "@types/express": "^4.17.13",
+    "@types/lodash": "^4.14.178",
     "@types/node": "^17.0.0",
     "@types/tunnel-ssh": "^4.1.1",
     "nodemon": "^2.0.15",
@@ -21,13 +22,19 @@
     "typescript": "^4.5.4"
   },
   "dependencies": {
+    "@types/express-list-endpoints": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^10.0.0",
     "express": "^4.17.2",
+    "express-list-endpoints": "^6.0.0",
     "helmet": "^4.6.0",
+    "lodash": "^4.17.21",
+    "moment": "^2.29.1",
     "mongoose": "^6.1.2",
     "pino": "^7.6.0",
     "pino-pretty": "^7.3.0",
+    "query-string": "^7.0.1",
+    "sequelize": "^6.11.0",
     "tunnel-ssh": "^4.1.6"
   }
 }
