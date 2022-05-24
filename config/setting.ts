@@ -1,0 +1,1 @@
+export const noSecurePath = ['/', '/article/token', '/article']

@@ -4,7 +4,7 @@ const plugin = {
   register: async () => {
     const userRouter = express.Router();
 
-    // const routes = await require('./routes')(userRouter)
+    const routes = await require('./routes')(userRouter)
     require('./model/Article')
     return userRouter
   }

@@ -1,6 +1,6 @@
 import _ from 'lodash';
 const qs = require('query-string');
-const Kafka = require('../../kafka');
+// const Kafka = require('../../kafka');
 import { createPopulate, createQuery, stringToAggregate } from './plugins';
 import { queryData, resultQuery, requestCreate, requestGet, resultBulk, requestUpdate, summary, summaryCustom } from '../../../interfaces/rest.interface';
 
@@ -70,20 +70,20 @@ class RESTful implements queryData{
           }
         };
       }
-  
       listConfig.populate = createPopulate(this, listConfig.populate, isJoin, query.queryInPopulate);
   
-      let paginate = [];
+      let paginate;
       let count = 0;
       if (isJoin) {
         paginate = await this.model.lookup(listConfig);
         count = paginate.length;
       }
+
       if (!isJoin) {
         paginate = await this.model.paginate(listConfig);
         count = await this.model.countDocuments(listConfig.q).exec();
       }
-  
+
       const data = {
         count: count,
         rows: paginate,
@@ -92,7 +92,11 @@ class RESTful implements queryData{
         totalPage: Math.ceil(count / listConfig.limit)
       };
   
-      let response: resultQuery;
+      let response: resultQuery = {
+        error: null,
+        data: null
+      };
+
       response.error = null;
       response.data = {
         status: 'success',
@@ -340,7 +344,7 @@ class RESTful implements queryData{
 
   remove = async function removeOne(this: RESTful, req: requestUpdate) {
     try {
-      const KafkaProduce = await Kafka.produce('log');
+      // const KafkaProduce = await Kafka.produce('log');
   
       const item = await this.model.findOne({ _id: req.params.id });
       const result = item.name ? item.name : 'item';
@@ -349,24 +353,24 @@ class RESTful implements queryData{
       let created_by_admin = req.auth && req.auth.credentials && req.auth.credentials.type !== 'user' && req.auth.credentials.id;
   
       if (created_by && this.modelName !== 'LogUser') {
-        KafkaProduce('log', 'create:loguser', {
-          data: {
-            user: created_by,
-            type: 'delete',
-            message: `${this.pluginName}:${this.modelName}`,
-            data: item
-          }
-        });
+        // KafkaProduce('log', 'create:loguser', {
+        //   data: {
+        //     user: created_by,
+        //     type: 'delete',
+        //     message: `${this.pluginName}:${this.modelName}`,
+        //     data: item
+        //   }
+        // });
       }
       if (created_by_admin && this.modelName !== 'LogAdmin') {
-        KafkaProduce('log', 'create:logadmin', {
-          data: {
-            admin: created_by_admin,
-            type: 'delete',
-            message: `${this.pluginName}:${this.modelName}`,
-            data: item
-          }
-        });
+        // KafkaProduce('log', 'create:logadmin', {
+        //   data: {
+        //     admin: created_by_admin,
+        //     type: 'delete',
+        //     message: `${this.pluginName}:${this.modelName}`,
+        //     data: item
+        //   }
+        // });
       }
   
       // res.locals.ability.throwUnlessCan('delete', _this.modelName);
@@ -524,4 +528,4 @@ class RESTful implements queryData{
   
 }
 
-export { RESTful }
+export default RESTful

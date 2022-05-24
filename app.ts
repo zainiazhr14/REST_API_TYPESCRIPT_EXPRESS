@@ -1,12 +1,8 @@
-import * as dotenv from 'dotenv'
 import express from 'express'
-import cors from 'cors'
-import helmet from 'helmet'
 import os from 'os'
 import db from './driver/database/mongodb/config'
 import listEndpoints from 'express-list-endpoints'
 import { AddressInfo } from 'net'
-import { itemsRouter } from "./src/items/items.routes"
 
 if (!process.env.APP_PORT) {
   process.exit(1)
@@ -29,22 +25,15 @@ const PORT:number = parseInt(process.env.APP_PORT as string, 10)
 const app = express()
 
 const start = async () => {
-  // package
-  dotenv.config()
-  app.use(helmet())
-  app.use(cors())
-  app.use(express.json())
-
   // plugin
+  await require('./app-package')(app)
   await require('./app-plugins')(app)
-  // app.use("/api/menu/items", itemsRouter)
-
+  db
+  console.table(listEndpoints(app))
 }
 
 const run = app.listen(PORT, addresses[0], async () => {
   await start()
-  console.table(listEndpoints(app))
-  db
   const { address } = run.address() as AddressInfo
   console.log(`Running on http://${address}:${PORT}`)
 })

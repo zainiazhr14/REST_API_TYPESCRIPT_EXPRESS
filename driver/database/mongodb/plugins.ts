@@ -1,8 +1,9 @@
 'use strict';
 
-import mongoose from 'mongoose';
 import moment from 'moment';
 import { resultListModel, returnListModel, createQueryInterface } from '../../../interfaces/plugins.interface'
+
+const mongoose = require('mongoose');
 
 const ObjectId = mongoose.Types.ObjectId;
 
@@ -157,8 +158,9 @@ export const stringToAggregate = (str: string) => {
 }
 
 
-export const createQuery = (query: any, search: any, isJoin: any, isFromSQL: boolean = false) => {
-  let result: createQueryInterface;
+export const createQuery = (query: any, search: any, isJoin: boolean, isFromSQL: boolean = false) => {
+  let result: createQueryInterface = {};
+  
   result.query = {};
   result.search = {};
   result.queryAndSearch = {};
@@ -244,7 +246,6 @@ export const createQuery = (query: any, search: any, isJoin: any, isFromSQL: boo
     ...result.query,
     ...result.search,
   };
-
   return result;
 }
 

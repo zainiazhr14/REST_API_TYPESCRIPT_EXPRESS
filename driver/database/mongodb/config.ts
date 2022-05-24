@@ -1,6 +1,7 @@
 import tunnel from 'tunnel-ssh';
-import mongoose from 'mongoose';
 import log from '../../../utility/logger'
+
+const mongoose = require('mongoose');
 
 let NODE_MICRO: number = parseInt(process.env.NODE_MICRO) || 0;
 
@@ -44,7 +45,7 @@ if (PASSWORD) {
 
 const db = mongoose.connection;
 
-db.on('error', err => {
+db.on('error', (err: any) => {
   log.error(err);
   log.error('MongoDB connection error. Please make sure MongoDB is running.');
 

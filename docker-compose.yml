@@ -1,0 +1,53 @@
+version: '3'
+
+services:
+  rest-type-express:
+    build: 
+      context: .
+      dockerfile: ./docker/rest-type-express/Dockerfile
+      args:
+        mode: local
+    container_name: rest-type-express
+    networks:
+      - rest-type-network
+    ports: 
+      - 7000:7000
+    depends_on:
+      - rest-type-postgres
+      - rest-type-mongo
+    environment:
+      DB_PG_HOST: base-api-postgres
+      DB_MONGO_BASE_URL: mongodb://rest-type-mongo:27017/
+    restart: always
+  rest-type-postgres:
+    image: postgres
+    container_name: rest-type-postgres
+    ports: 
+      - 5436:5432
+    volumes:
+      - rest-type-volume:/var/lib/postgresql/data
+    networks:
+      - rest-type-network
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: root
+      POSTGRES_USER: postgres
+      POSTGRES_DB: dev-base
+
+  rest-type-mongo:
+    image: mongo
+    container_name: rest-type-mongo
+    ports: 
+      - 27020:27017
+    volumes:
+      - rest-type-volume:/etc/mongo
+    networks:
+      - rest-type-network
+    restart: always
+networks:
+  rest-type-network:
+    name: rest-type-network
+volumes:
+  rest-type-volume:
+    name: rest-type-volume
+

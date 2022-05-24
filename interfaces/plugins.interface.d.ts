@@ -10,9 +10,12 @@ export interface returnListModel {
   ref: any
 }
 
+// export interface createQueryInterface {
+//   query: any,
+//   search: any,
+//   queryAndSearch: any,
+//   queryInPopulate: any
+// }
 export interface createQueryInterface {
-  query: any,
-  search: any,
-  queryAndSearch: any,
-  queryInPopulate: any
+  [key: string]: any
 }

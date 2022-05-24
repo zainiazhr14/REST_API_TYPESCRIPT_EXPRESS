@@ -23,4 +23,4 @@ const ArticlesSchema = new mongoose.Schema(
 
 ArticlesSchema.plugin(model);
 
-const ar = mongoose.model('Articles', ArticlesSchema);
+module.exports = mongoose.model('Articles', ArticlesSchema);
