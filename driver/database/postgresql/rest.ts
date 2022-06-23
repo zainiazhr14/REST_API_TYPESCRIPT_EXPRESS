@@ -1,22 +1,11 @@
-import _ from 'lodash';
-const qs = require('query-string');
-// const Kafka = require('../../kafka');
-import { createPopulate, createQuery, stringToAggregate } from './plugins';
+import _ from'lodash';
+import qs from'query-string';
+import { createPopulate, stringToAggregate, populateToInclude } from'./plugins';
+import createQuery from'./createQuery';
+import Boom from 'boom';
+import Kafka from '../../kafka';
 import { queryData, resultQuery, requestCreate, requestGet, resultBulk, requestUpdate, summary, summaryCustom } from '../../../interfaces/rest.interface';
 
-// function RESTful(pluginName: string, modelName: string) {
-//   this.modelName = modelName;
-//   this.lowerName = _.toLower(modelName);
-//   this.pluginName = pluginName;
-//   this.model = require(`../../../plugins/${pluginName}/model/${modelName}`);
-//   this.page = 1;
-//   this.limit = 10;
-//   this.sort = '-createdAt';
-//   this.populate = '';
-//   this.q = {};
-//   this.search = {};
-//   this.isJoin = false;
-// }
 
 class RESTful implements queryData{
   protected modelName: string;
@@ -45,7 +34,8 @@ class RESTful implements queryData{
     this.isJoin = false;
   }
 
-  public list = async function getList(this: RESTful, req: any): Promise<resultQuery> {
+  public list = async function getList(this: RESTful, req: any) {
+    // if (req.auth.credentials.type !== 'admin') throw Boom.unauthorized(`unauthorized.`, req.payload);
     try {
       const listConfig = {
         q: qs.parse(req.query.q) || this.q,
@@ -59,7 +49,18 @@ class RESTful implements queryData{
   
       let isJoin = listConfig.isJoin;
   
-      let query = createQuery(listConfig.q, listConfig.search, isJoin);
+      let sort = [];
+      if (listConfig.sort) {
+        sort = listConfig.sort.split(' ');
+        sort.map((s: any, k: any) => {
+          sort[k] = [s, 'asc'];
+          if (s.includes('-')) {
+            sort[k] = [s.replace('-', ''), 'desc'];
+          }
+        }).includes('-');
+      }
+      
+      let query = createQuery(listConfig.q, listConfig.search);
       listConfig.q = query.queryAndSearch;
   
       if (req.query.date && req.query.datekey && req.query.dateop) {
@@ -70,23 +71,22 @@ class RESTful implements queryData{
           }
         };
       }
-      listConfig.populate = createPopulate(this, listConfig.populate, isJoin, query.queryInPopulate);
   
-      let paginate;
-      let count = 0;
-      if (isJoin) {
-        paginate = await this.model.lookup(listConfig);
-        count = paginate.length;
-      }
-
-      if (!isJoin) {
-        paginate = await this.model.paginate(listConfig);
-        count = await this.model.countDocuments(listConfig.q).exec();
-      }
-
+      listConfig.populate = createPopulate(this, listConfig.populate, isJoin, query.queryInPopulate);
+      const include = populateToInclude(listConfig.populate);
+      const options = {
+        limit: listConfig.limit,
+        offset: (listConfig.page - 1) * listConfig.limit,
+        where: listConfig.q,
+        order: [sort],
+        include
+      };
+  
+      const {rows, count} = await this.model.findAndCountAll(options);
+  
       const data = {
         count: count,
-        rows: paginate,
+        [this.lowerName]: rows,
         page: listConfig.page,
         limit: listConfig.limit,
         totalPage: Math.ceil(count / listConfig.limit)
@@ -108,26 +108,26 @@ class RESTful implements queryData{
     }
   };
 
-  public get = async function getOne(this: RESTful, req: requestGet): Promise<resultQuery> {
+  public get = async function getOne(this: RESTful, req: any) {
+    // if (req.auth.credentials.type !== 'admin') throw Boom.unauthorized(`unauthorized.`, req.payload);
     try {
-      // if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
-      //   throw `not found`;
-      // }
   
       const isJoin = false;
       let queryInPopulate = {};
       let populateOpt = req.query.populate || this.populate;
   
       populateOpt = createPopulate(this, populateOpt, isJoin, queryInPopulate);
+      const include = populateToInclude(populateOpt);
+      const item = await this.model.findOne({where:{ id: req.params.id }, include});
   
-      const item = await this.model.getOne({ _id: req.params.id }, populateOpt);
-  
-      // res.locals.ability.throwUnlessCan('read', _this.modelName, item);
       const data = {
-        rows: item
+        [this.lowerName]: item
       };
   
-      let response: resultQuery;
+      let response: resultQuery = {
+        error: null,
+        data: null
+      };
       response.error = null;
       response.data = {
         status: 'success',
@@ -139,27 +139,21 @@ class RESTful implements queryData{
     }
   };
 
-  public create = async function createOne(this: RESTful, req: requestCreate): Promise<resultQuery> {
+  public create = async function createOne(this: RESTful, req: any) {
+    // if (req.auth.credentials.type !== 'admin') throw Boom.unauthorized(`unauthorized.`, req.payload);
     try {
       // res.locals.ability.throwUnlessCan('create', _this.modelName);
-      let created_by = req.auth && req.auth.credentials && req.auth.credentials.type === 'user' && req.auth.credentials.id;
-      let created_by_admin = req.auth && req.auth.credentials && req.auth.credentials.type !== 'user' && req.auth.credentials.id;
+  
+      let created_by = req.auth && req.auth.credentials && req.auth.credentials.id;
       if (req.payload && req.payload.created_by) {
         created_by = req.payload.created_by;
       }
-      if (req.payload && req.payload.created_by_admin) {
-        created_by_admin = req.payload.created_by_admin;
-      }
   
-      let modifiedPayload = req.payload;
-      if (created_by) {
-        modifiedPayload.created_by = created_by;
-        modifiedPayload.created_by_name = req.auth.credentials.name;
-      }
-      if (created_by_admin) {
-        modifiedPayload.created_by_admin = created_by_admin;
-        modifiedPayload.created_by_admin_name = req.auth.credentials.name;
-      }
+      const modifiedPayload = {
+        ...req.payload,
+        created_by: created_by,
+        updated_by: created_by
+      };
   
       const item = await this.model.create(modifiedPayload);
   
@@ -168,11 +162,14 @@ class RESTful implements queryData{
       // };
   
       const data = {
-        rows: item,
+        [this.lowerName]: item,
         message: 'Successfully create data'
       };
   
-      let response: resultQuery;
+      let response: resultQuery = {
+        error: null,
+        data: null
+      };
       response.error = null;
       response.data = {
         status: 'success',
@@ -180,11 +177,13 @@ class RESTful implements queryData{
       };
       return response;
     } catch (error) {
+      console.log(error);
       return { error, data: null };
     }
   };
 
-  public createOrUpdate = async function createOrUpdate(this: RESTful, findQuery: any, insertedData: any): Promise<resultQuery> {
+  public createOrUpdate = async function createOrUpdate(this: RESTful, findQuery: any, insertedData: any) {
+    // if (req.auth.credentials.type !== 'admin') throw Boom.unauthorized('unauthorized.', req.payload);
     try {
       const isExist = await this.model.findOne(findQuery);
       let message = 'Successfully create data';
@@ -202,11 +201,14 @@ class RESTful implements queryData{
       }
   
       const data = {
-        rows: result,
+        [this.lowerName]: result,
         message
       };
   
-      let response: resultQuery;
+      let response: resultQuery = {
+        error: null,
+        data: null
+      };
       response.error = null;
       response.data = { status: 'success', data };
   
@@ -217,7 +219,8 @@ class RESTful implements queryData{
     }
   };
 
-  public createBulk = async function createBulk(this: RESTful, dataBulk: any[], req: any ): Promise<resultBulk[]> {
+  public createBulk = async function createBulk(this: RESTful, req: any, dataBulk: any) {
+    if (req.auth.credentials.type !== 'admin') throw Boom.unauthorized('unauthorized.', req.payload);
     let response: Array<resultBulk>;
   
     await Promise.all(dataBulk.map(async () => {
@@ -233,7 +236,7 @@ class RESTful implements queryData{
           const modifiedPayload = {
             ...data,
             created_by: created_by,
-            updated_By: created_by
+            updated_by: created_by
           };
   
           let result: resultBulk;
@@ -251,7 +254,8 @@ class RESTful implements queryData{
     return response;
   };
 
-  public updateBulk = async function updateBulk(this: RESTful, dataBulk: any[], req: any ): Promise <resultBulk[]> {
+  public updateBulk = async function updateBulk(this: RESTful, req: any, dataBulk: any) {
+    if (req.auth.credentials.type !== 'admin') throw Boom.unauthorized('unauthorized.', req.payload);
     let response: Array<resultBulk>;
   
     await Promise.all(dataBulk.map(async () => {
@@ -292,45 +296,37 @@ class RESTful implements queryData{
     return response;
   };
 
-  update = async function updateOne(this: RESTful, req: requestUpdate) {
+  public update = async function updateOne(this: RESTful, req: any) {
+    // if (req.auth.credentials.type !== 'admin') throw Boom.unauthorized(`unauthorized.`, req.payload);
     try {
       // res.locals.ability.throwUnlessCan('update', _this.modelName);
   
-      let created_by = req.auth && req.auth.credentials && req.auth.credentials.type === 'user' && req.auth.credentials.id;
-      let created_by_admin = req.auth && req.auth.credentials && req.auth.credentials.type !== 'user' && req.auth.credentials.id;
+      let created_by = req.auth && req.auth.credentials && req.auth.credentials._id;
       if (req.payload && req.payload.created_by) {
         created_by = req.payload.created_by;
       }
-      if (req.payload && req.payload.created_by_admin) {
-        created_by_admin = req.payload.created_by_admin;
-      }
   
-      let modifiedPayload = req.payload;
-      if (created_by) {
-        modifiedPayload.updated_by = created_by;
-        modifiedPayload.updated_by_name = req.auth.credentials.name;
-      }
-      if (created_by_admin) {
-        modifiedPayload.updated_by_admin = created_by_admin;
-        modifiedPayload.updated_by_admin_name = req.auth.credentials.name;
-      }
+      const modifiedPayload = {
+        ...req.payload,
+        updated_by: created_by
+      };
   
       Object.keys(modifiedPayload).forEach(function(key) {
         if (modifiedPayload[key] === null) modifiedPayload[key] = undefined;
       });
   
-      const item = await this.model.update(
-        { _id: req.params.id },
-        { $set: modifiedPayload },
-        { safe: true, new: false }
-      );
+      let item = await this.model.findOne({where: {id: req.params.id}});
+      item.update(modifiedPayload);
   
       const data = {
-        rows: item,
+        [this.lowerName]: item,
         message: 'Successfully update data'
       };
   
-      let response: resultQuery;
+      let response: resultQuery = {
+        error: null,
+        data: null
+      };
       response.error = null;
       response.data = {
         status: 'success',
@@ -342,45 +338,47 @@ class RESTful implements queryData{
     }
   };
 
-  remove = async function removeOne(this: RESTful, req: requestUpdate) {
+  public remove = async function removeOne(this: RESTful, req: any) {
+    // if (req.auth.credentials.type !== 'admin') throw Boom.unauthorized(`unauthorized.`, req.payload);
     try {
-      // const KafkaProduce = await Kafka.produce('log');
-  
-      const item = await this.model.findOne({ _id: req.params.id });
+      const KafkaProduce = await Kafka.produce('log');
+      const item = await this.model.findOne({where:{ id: req.params.id }});
       const result = item.name ? item.name : 'item';
   
       let created_by = req.auth && req.auth.credentials && req.auth.credentials.type === 'user' && req.auth.credentials.id;
       let created_by_admin = req.auth && req.auth.credentials && req.auth.credentials.type !== 'user' && req.auth.credentials.id;
-  
       if (created_by && this.modelName !== 'LogUser') {
-        // KafkaProduce('log', 'create:loguser', {
-        //   data: {
-        //     user: created_by,
-        //     type: 'delete',
-        //     message: `${this.pluginName}:${this.modelName}`,
-        //     data: item
-        //   }
-        // });
+        KafkaProduce('log', 'create:loguser', {
+          data: {
+            user: created_by,
+            type: 'delete',
+            message: `${this.pluginName}:${this.modelName}`,
+            data: item.toJSON()
+          }
+        });
       }
       if (created_by_admin && this.modelName !== 'LogAdmin') {
-        // KafkaProduce('log', 'create:logadmin', {
-        //   data: {
-        //     admin: created_by_admin,
-        //     type: 'delete',
-        //     message: `${this.pluginName}:${this.modelName}`,
-        //     data: item
-        //   }
-        // });
+        KafkaProduce('log', 'create:logadmin', {
+          data: {
+            admin: created_by_admin,
+            type: 'delete',
+            message: `${this.pluginName}:${this.modelName}`,
+            data: item.toJSON()
+          }
+        });
       }
   
       // res.locals.ability.throwUnlessCan('delete', _this.modelName);
-      await item.remove();
+      await item.destroy();
   
       const data = {
         message: `Successfully remove ${result}`
       };
   
-      let response: resultQuery;
+      let response: resultQuery = {
+        error: null,
+        data: null
+      };
       response.error = null;
       response.data = {
         status: 'success',
@@ -392,7 +390,8 @@ class RESTful implements queryData{
     }
   };
 
-  summary = async function summary(this: RESTful, req: summary) {
+  public summary = async function summary(this: RESTful, req: any) {
+    if (req.auth.credentials.type !== 'admin') throw Boom.unauthorized('unauthorized.', req.payload);
     try {
       let queryDate = [];
   
@@ -408,7 +407,7 @@ class RESTful implements queryData{
         populate: req.query.populate || this.populate
       };
   
-      let query = createQuery(listConfig.q, listConfig.search, false);
+      let query = createQuery(listConfig.q, listConfig.search);
       listConfig.q = query.queryAndSearch;
   
       if (start && end) {
@@ -491,10 +490,13 @@ class RESTful implements queryData{
       ]).exec();
   
       const data = {
-        rows: result
+        [this.lowerName]: result
       };
   
-      let response: resultQuery;
+      let response: resultQuery = {
+        error: null,
+        data: null
+      };
       response.error = null;
       response.data = {
         status: 'success',
@@ -507,13 +509,17 @@ class RESTful implements queryData{
     }
   };
 
-  summaryCustom = async function summaryCustom(this: RESTful, req: summaryCustom) {
+  public summaryCustom = async function summaryCustom(this: RESTful, req: any) {
+    if (req.auth.credentials.type !== 'admin') throw Boom.unauthorized('unauthorized.', req.payload);
     try {
-      // let createdBy = req.auth && req.auth.credentials && req.auth.credentials._id;
+      // let created_by = req.auth && req.auth.credentials && req.auth.credentials._id;
   
       const item = await this.model.aggregate(stringToAggregate(req.payload.q)).exec();
   
-      let response: resultQuery;
+      let response: resultQuery = {
+        error: null,
+        data: null
+      };
       response.error = null;
       response.data = {
         status: 'success',
@@ -525,7 +531,8 @@ class RESTful implements queryData{
       return { error, data: null };
     }
   };
-  
+
 }
 
-export default RESTful
+
+module.exports = RESTful;

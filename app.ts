@@ -3,6 +3,7 @@ import os from 'os'
 import db from './driver/database/mongodb/config'
 import listEndpoints from 'express-list-endpoints'
 import { AddressInfo } from 'net'
+import redisClient from './driver/redis'
 
 if (!process.env.APP_PORT) {
   process.exit(1)
@@ -26,8 +27,9 @@ const app = express()
 
 const start = async () => {
   // plugin
+  const redis_client = await redisClient();
   await require('./app-package')(app)
-  await require('./app-plugins')(app)
+  await require('./app-plugins')(app, redis_client)
   db
   console.table(listEndpoints(app))
 }

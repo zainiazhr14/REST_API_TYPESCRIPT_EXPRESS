@@ -3,7 +3,7 @@ import RESTfull from '../../driver/database/mongodb/rest'
 
 const ArticleREST = new RESTfull('article', 'Article')
 
-module.exports = (routes: any) => {
+module.exports = (routes: any, redis_client: any) => {
   routes.get('/', async (req: any, res: any) => {
     const { data, error } = await ArticleREST.list(req);
     if (error) return res.status(400).send(error);

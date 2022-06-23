@@ -1,11 +1,11 @@
 import express, { Request, Response } from "express";
 
 const plugin = {
-  register: async () => {
+  register: async (redis_client: any) => {
     const userRouter = express.Router();
 
-    const routes = await require('./routes')(userRouter)
-    require('./model/Article')
+    await require('./routes')(userRouter, redis_client)
+    
     return userRouter
   }
 }

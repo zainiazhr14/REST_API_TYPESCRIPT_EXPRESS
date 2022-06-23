@@ -30,10 +30,10 @@ const buildPluginsExpress = () : any => {
   return result
 }
 
-module.exports = async (app: any) => {
+module.exports = async (app: any, redis_client: any) => {
   const routes = buildPluginsExpress()
   for (const route of routes) {
-    const routePrefix = await route.routes.register()
+    const routePrefix = await route.routes.register(redis_client)
     await app.use(route.prefix, routePrefix)
   }
   // for (const x of app._router.stack) {
