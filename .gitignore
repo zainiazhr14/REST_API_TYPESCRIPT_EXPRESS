@@ -7,5 +7,3 @@
 .env.local
 .env.development
 .env.production
-
-Dockerfile
